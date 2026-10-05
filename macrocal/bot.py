@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import threading
 from collections.abc import Callable, MutableMapping
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from google.genai import types
 
 from macrocal import events, fred, intel, markets
 from macrocal.config import get_secret
+from macrocal.text import sanitize_answer
 
 # Not verifiable without a key (checked against third-party pages only, 2026-10-05).
 # Override with the GEMINI_MODEL secret; confirm with a live call once a key exists.
@@ -33,6 +35,8 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 SESSION_CAP = 15
 DAILY_CAP = 200
 MAX_TOOL_ROUNDS = 4
+MAX_CALLS_PER_ROUND = 4  # a reply can ask for dozens of lookups at once; only a few run
+MAX_CALLS_PER_QUESTION = 8
 MAX_TOOL_CHARS = 6000
 MAX_QUESTION_CHARS = 500
 MAX_HISTORY_TURNS = 10
@@ -278,11 +282,8 @@ def _check(name: str, value, schema: dict) -> None:
             raise ToolError(f"'{name}' must be one of: {', '.join(schema['enum'])}")
         if len(value) > schema.get("maxLength", 200):
             raise ToolError(f"'{name}' is too long")
-        if "pattern" in schema:
-            import re
-
-            if not re.fullmatch(schema["pattern"], value):
-                raise ToolError(f"'{name}' has the wrong format")
+        if "pattern" in schema and not re.fullmatch(schema["pattern"], value):
+            raise ToolError(f"'{name}' has the wrong format")
     elif kind == "array":
         if not isinstance(value, list | tuple):
             raise ToolError(f"'{name}' must be a list")
@@ -353,7 +354,7 @@ class UsageLimiter:
             self._roll()
             used = session.get("_bot_messages", 0)
             if used >= self.session_cap:
-                return f"Session limit reached ({self.session_cap} questions). Reload the page to start again."
+                return f"Session limit reached ({self.session_cap} questions). Please come back later."
             if self._count >= self.daily_cap:
                 return "The daily question limit for this app has been reached. Try again tomorrow."
             session["_bot_messages"] = used + 1
@@ -429,7 +430,7 @@ class Analyst:
         recent = history[-MAX_HISTORY_TURNS * 2 :]
         contents = [_content("model" if turn["role"] == "assistant" else "user", turn["text"]) for turn in recent]
         contents.append(_content("user", question))
-        config, done = self._config(), []
+        config, done, executed = self._config(), [], 0
 
         for round_number in range(MAX_TOOL_ROUNDS + 1):
             try:
@@ -439,16 +440,28 @@ class Analyst:
             calls = response.function_calls
             if not calls:
                 text = (response.text or "").strip() or "I could not produce an answer from the available data."
-                return Answer(text=text, tool_calls=done)
+                return Answer(text=sanitize_answer(text), tool_calls=done)
             if round_number == MAX_TOOL_ROUNDS:
                 break
-            contents.append(response.candidates[0].content)
-            parts = []
+            candidates = getattr(response, "candidates", None) or []
+            if not candidates:
+                msg = "Gemini returned no answer (it may have been blocked). Try rephrasing."
+                return Answer(tool_calls=done, error=msg)
+            contents.append(candidates[0].content)
+            parts, ran_this_round, skipped = [], 0, 0
             for call in calls:
-                args = dict(call.args or {})
-                result = run_tool(call.name, args)
-                done.append(ToolCall(call.name, args, ok="error" not in result))
+                if ran_this_round >= MAX_CALLS_PER_ROUND or executed >= MAX_CALLS_PER_QUESTION:
+                    skipped += 1
+                    result = {"error": "Too many lookups at once. Ask for less, or one thing at a time."}
+                else:
+                    args = dict(call.args or {})
+                    result = run_tool(call.name, args)
+                    done.append(ToolCall(call.name, args, ok="error" not in result))
+                    ran_this_round += 1
+                    executed += 1
                 parts.append(types.Part.from_function_response(name=call.name, response={"result": result}))
+            if skipped:
+                done.append(ToolCall(f"{skipped} more lookups skipped", {}, ok=False))
             contents.append(types.Content(role="user", parts=parts))
         return Answer(tool_calls=done, error="That needed too many data lookups. Try a narrower question.")
 

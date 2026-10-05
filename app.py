@@ -14,6 +14,7 @@ from macrocal.panels import (
     render_macro_tab,
     render_markets_tab,
 )
+from macrocal.text import escape_markdown
 
 st.set_page_config(page_title="MacroCal", page_icon="📈", layout="wide")
 style.inject(st)
@@ -34,7 +35,7 @@ view = st.segmented_control(
 
 
 def render_event(event_id: str, name: str, currency: str) -> None:
-    st.subheader(name)
+    st.subheader(escape_markdown(name))
     details_col, context_col = st.columns(2)
     with details_col:
         render_event_details(event_id)
@@ -52,12 +53,12 @@ def render_event_details(event_id: str) -> None:
     col1.metric("Actual", d.get("actual"))
     col2.metric("Consensus", d.get("consensus"))
     col3.metric("Previous", d.get("previous"))
-    st.write(f"**Country:** {d.get('countryCode', 'n/a')}")
-    st.write(f"**Category:** {(d.get('category') or {}).get('name', 'n/a')}")
-    st.write(f"**Source:** {d.get('source', 'n/a')}")
+    st.write(f"**Country:** {escape_markdown(d.get('countryCode', 'n/a'))}")
+    st.write(f"**Category:** {escape_markdown((d.get('category') or {}).get('name', 'n/a'))}")
+    st.write(f"**Source:** {escape_markdown(d.get('source', 'n/a'))}")
     description = events.clean_description(d.get("description"))
     if description:
-        st.write(description)
+        st.write(escape_markdown(description))
 
 
 def render_calendar_tab() -> None:

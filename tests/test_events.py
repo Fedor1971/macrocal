@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from macrocal import events
 
@@ -87,3 +88,21 @@ def test_fetch_event_details_success_keeps_dict(monkeypatch):
     r = events.fetch_event_details("abc")
     assert r.ok
     assert r.data["countryCode"] == "US"
+
+
+def test_calendar_ranges_longer_than_the_cap_are_refused_without_a_request(monkeypatch):
+    monkeypatch.setattr(events, "_fetch_calendar_raw", lambda s, e: pytest.fail("must not fetch"))
+    r = events.fetch_calendar("2026-01-01", "2026-12-31")
+    assert not r.ok
+    assert str(events.MAX_RANGE_DAYS) in r.error
+
+
+def test_a_range_at_the_cap_is_allowed(monkeypatch):
+    monkeypatch.setattr(events, "_fetch_calendar_raw", lambda s, e: raw_calendar())
+    assert events.fetch_calendar("2026-10-01", "2026-10-31").ok  # 30 days
+
+
+def test_backwards_and_malformed_ranges_are_refused(monkeypatch):
+    monkeypatch.setattr(events, "_fetch_calendar_raw", lambda s, e: pytest.fail("must not fetch"))
+    assert not events.fetch_calendar("2026-10-10", "2026-10-01").ok
+    assert not events.fetch_calendar("soon", "later").ok

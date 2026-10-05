@@ -9,6 +9,7 @@ ecocal facts, confirmed live while building ecocal-dashboard (not from its READM
 
 from __future__ import annotations
 
+import datetime as dt
 import html
 import re
 import sys
@@ -31,6 +32,7 @@ from ecocal.constants import API_SOURCE_URL, BASE_URL, DEFAULT_USER_AGENT
 from macrocal.result import Result
 
 SOURCE = "fxstreet (via ecocal)"
+MAX_RANGE_DAYS = 31  # a public app must not let anyone ask fxstreet for years of events
 BASIC_COLUMNS = ["Id", "Start", "Name", "Impact", "Currency"]
 
 
@@ -59,7 +61,7 @@ def clean_description(raw_html: str | None) -> str:
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
-@st.cache_data(ttl=600, show_spinner="Fetching economic calendar...")
+@st.cache_data(ttl=600, max_entries=32, show_spinner="Fetching economic calendar...")
 def _fetch_calendar_raw(start_date: str, end_date: str) -> pd.DataFrame:
     # Raises on failure so st.cache_data never caches an error.
     cal = Calendar(
@@ -73,7 +75,15 @@ def _fetch_calendar_raw(start_date: str, end_date: str) -> pd.DataFrame:
 
 
 def fetch_calendar(start_date: str, end_date: str) -> Result:
-    """Basic calendar for a date range (YYYY-MM-DD strings)."""
+    """Basic calendar for a date range (YYYY-MM-DD strings), at most MAX_RANGE_DAYS long."""
+    try:
+        start, end = dt.date.fromisoformat(start_date), dt.date.fromisoformat(end_date)
+    except ValueError:
+        return Result.fail("Dates must look like 2026-10-05", SOURCE)
+    if start > end:
+        return Result.fail("The start date must not be after the end date", SOURCE)
+    if (end - start).days > MAX_RANGE_DAYS:
+        return Result.fail(f"Choose a range of at most {MAX_RANGE_DAYS} days", SOURCE)
     try:
         df = shape_calendar(_fetch_calendar_raw(start_date, end_date))
     except Exception as exc:  # noqa: BLE001 - shown to the user via Result.error
@@ -81,7 +91,7 @@ def fetch_calendar(start_date: str, end_date: str) -> Result:
     return Result(df, source=SOURCE, as_of=f"{start_date} to {end_date}")
 
 
-@st.cache_data(ttl=600, show_spinner="Fetching event details...")
+@st.cache_data(ttl=600, max_entries=256, show_spinner="Fetching event details...")
 def _fetch_event_details_raw(event_id: str) -> dict:
     # Uses ecocal's public constants, not its private Calendar._requestDetails.
     response = requests.get(

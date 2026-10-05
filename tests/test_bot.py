@@ -397,3 +397,58 @@ def test_fred_tool_output_is_available_when_keyed(monkeypatch):
     out = bot.run_tool("fred_series", {"series": "FEDFUNDS"})
     assert out["source"] == fred.SOURCE
     assert out["latest"]["value"] == pytest.approx(5.3)
+
+
+# --- review fixes: bounded lookups, blocked replies, markdown-safe answers ---------------------------
+
+
+def test_tool_calls_per_round_are_capped(monkeypatch):
+    ran = []
+    monkeypatch.setattr(intel, "us_series", lambda s: (ran.append(s), series_result())[1])
+    many = [("us_series", {"series": "us_cpi"})] * 30
+    a, _ = analyst([reply(calls=many), reply(text="done")])
+    ans = a.ask("everything", [], {})
+    assert len(ran) <= bot.MAX_CALLS_PER_ROUND
+    assert sum(c.ok for c in ans.tool_calls) <= bot.MAX_CALLS_PER_ROUND
+    assert len(ans.tool_calls) <= bot.MAX_CALLS_PER_ROUND + 1  # the skipped rest is one entry, not 26
+
+
+def test_total_tool_calls_per_question_are_capped(monkeypatch):
+    ran = []
+    monkeypatch.setattr(intel, "us_series", lambda s: (ran.append(s), series_result())[1])
+    rounds = [reply(calls=[("us_series", {"series": "us_cpi"})] * bot.MAX_CALLS_PER_ROUND) for _ in range(3)]
+    a, _ = analyst([*rounds, reply(text="done")])
+    a.ask("lots", [], {})
+    assert len(ran) <= bot.MAX_CALLS_PER_QUESTION
+
+
+@pytest.mark.parametrize("blocked", [SimpleNamespace(text=None, function_calls=None, candidates=[]),
+                                     SimpleNamespace(text=None, function_calls=None, candidates=None)])
+def test_a_blocked_reply_without_text_is_a_clean_answer_not_a_crash(blocked):
+    a, _ = analyst([blocked])
+    ans = a.ask("hello", [], {})
+    assert ans.error is None
+    assert "could not" in ans.text.lower()
+
+
+def test_a_tool_call_reply_without_candidates_is_a_clean_error():
+    broken = SimpleNamespace(text=None, function_calls=[SimpleNamespace(name="us_series", args={})], candidates=[])
+    a, _ = analyst([broken])
+    ans = a.ask("hello", [], {})
+    assert ans.error
+    assert "blocked" in ans.error.lower() or "no answer" in ans.error.lower()
+
+
+def test_model_answers_are_stripped_of_images_and_html():
+    a, _ = analyst([reply(text="Rate 4.2% ![t](https://evil.example/x.png?d=1) <script>x</script>")])
+    ans = a.ask("hello", [], {})
+    assert "evil.example" not in ans.text
+    assert "<" not in ans.text
+    assert "4.2%" in ans.text
+
+
+def test_cap_messages_do_not_tell_people_how_to_bypass_them():
+    limiter = bot.UsageLimiter(session_cap=1, daily_cap=5, today=lambda: dt.date(2026, 10, 5))
+    session = {}
+    limiter.try_consume(session)
+    assert "reload" not in limiter.try_consume(session).lower()

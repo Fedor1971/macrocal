@@ -10,6 +10,7 @@ import streamlit as st
 from macrocal import bot, fred, intel, markets
 from macrocal.context import context_stats
 from macrocal.mapping import series_for_event
+from macrocal.text import escape_markdown
 
 PRIMARY = "#008D7F"
 _MARGIN = {"l": 0, "r": 0, "t": 10, "b": 0}
@@ -75,8 +76,8 @@ def _render_result(
     st.plotly_chart(fig, width="stretch")
 
     st.caption(
-        f"{result.meta.get('label', fallback_label)} · source: {result.source} · "
-        f"as of {result.as_of}. {note}".strip()
+        f"{escape_markdown(result.meta.get('label', fallback_label))} · "
+        f"source: {escape_markdown(result.source)} · as of {escape_markdown(result.as_of)}. {note}".strip()
     )
 
 
@@ -105,7 +106,8 @@ def _render_country_compare(indicator: str, countries: list[str]) -> None:
     st.plotly_chart(fig, width="stretch")
     years = ", ".join(str(y) for y in sorted(result.data["year"].unique()))
     st.caption(
-        f"{result.meta.get('label', indicator)} · source: {result.source} · latest year per country "
+        f"{escape_markdown(result.meta.get('label', indicator))} · source: {escape_markdown(result.source)} · "
+        f"latest year per country "
         f"({years}); the newest World Bank year can be provisional."
     )
 
@@ -115,12 +117,12 @@ def _render_country_profile(country: str) -> None:
     if not result.ok:
         st.warning(result.error or "No profile came back for this country.")
         return
-    st.markdown(f"#### {result.meta.get('country', country)}")
+    st.markdown(f"#### {escape_markdown(result.meta.get('country', country))}")
     rows = list(result.data.itertuples())
     for start in range(0, len(rows), 3):
         for col, row in zip(st.columns(3), rows[start : start + 3], strict=False):
             col.metric(row.label, _compact(row.value), help=f"Year {row.year}")
-    st.caption(f"source: {result.source} · annual data, years differ by indicator.")
+    st.caption(f"source: {escape_markdown(result.source)} · annual data, years differ by indicator.")
 
 
 def render_macro_tab() -> None:
@@ -255,14 +257,14 @@ def render_ask_tab() -> None:
 
     for turn in history:
         with st.chat_message(turn["role"]):
-            st.markdown(turn["text"])
+            st.markdown(escape_markdown(turn["text"]) if turn["role"] == "user" else turn["text"])
             _render_tools_used(turn.get("tools", []))
 
     question = st.chat_input("Ask about the calendar, US data, countries or markets", max_chars=bot.MAX_QUESTION_CHARS)
     if not question:
         return
     with st.chat_message("user"):
-        st.markdown(question)
+        st.markdown(escape_markdown(question))
     with st.chat_message("assistant"), st.spinner("Looking at the data..."):
         sent = [{"role": t["role"], "text": t["text"]} for t in history]
         answer = st.session_state["analyst"].ask(question, sent, st.session_state)

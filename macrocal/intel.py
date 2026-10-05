@@ -182,7 +182,7 @@ def _clean(text: str) -> str:
     return text.replace("�", "-")
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, max_entries=16, show_spinner=False)
 def _us_series_raw(series: str) -> dict:
     # Raises on failure so st.cache_data never caches an error.
     return call_tool("us_series", {"series": series})
@@ -233,7 +233,7 @@ def _wb(tool: str, arguments: dict, build) -> Result:
     return Result(frame, source=_clean(payload.get("source", WB_SOURCE)), meta=meta)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, max_entries=128, show_spinner=False)
 def _wb_raw(tool: str, arguments_json: str) -> dict:
     # Raises on failure so st.cache_data never caches an error.
     return call_tool(tool, json.loads(arguments_json))

@@ -38,7 +38,7 @@ def available() -> bool:
     return get_secret("FRED_API_KEY") is not None
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, max_entries=16, show_spinner=False)
 def _observations(series_id: str) -> list[dict]:
     # Raises on failure so st.cache_data never caches an error. The key is read here, not
     # passed in, so it is never part of a cache key or a call signature.

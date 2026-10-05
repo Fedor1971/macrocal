@@ -55,7 +55,7 @@ def preset_window(name: str, today: dt.date) -> tuple[str, str]:
     return start.isoformat(), today.isoformat()
 
 
-@st.cache_data(ttl=3600, show_spinner="Fetching market prices...")
+@st.cache_data(ttl=3600, max_entries=32, show_spinner="Fetching market prices...")
 def _download(symbols: tuple[str, ...], start: str, end: str) -> pd.DataFrame:
     # Raises on failure so st.cache_data never caches an error.
     import yfinance as yf  # lazy: slow to import, only needed by this view
