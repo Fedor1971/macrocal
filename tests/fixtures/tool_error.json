@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\n  \"error\": \"No data for country 'ZZZ'. Use an ISO code like US, DE, JP.\"\n}"}],"isError":true}}

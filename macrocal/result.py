@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -12,6 +12,7 @@ class Result:
     error: str | None = None
     source: str = ""
     as_of: str = ""  # data date as reported by the source, not "now"
+    meta: dict = field(default_factory=dict)  # e.g. a human label for a series
 
     @property
     def ok(self) -> bool:

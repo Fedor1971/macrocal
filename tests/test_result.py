@@ -23,6 +23,11 @@ def test_result_with_dict_payload_is_ok():
     assert not Result({}).ok
 
 
+def test_result_meta_defaults_to_empty_dict_per_instance():
+    a, b = Result(None), Result(None)
+    assert a.meta == {} and a.meta is not b.meta
+
+
 def test_result_is_immutable():
     r = Result(None, error="x")
     try:
