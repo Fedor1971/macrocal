@@ -80,3 +80,69 @@ def test_source_failure_shows_warning_not_exception(monkeypatch):
     at = AppTest.from_function(panel_app).run()
     assert not at.exception
     assert any("unreachable" in w.value for w in at.warning)
+
+
+# --- Macro tab ---------------------------------------------------------------------
+
+
+def wb_profile() -> Result:
+    df = pd.DataFrame(
+        {
+            "key": ["gdp", "unemployment"],
+            "label": ["GDP (current US$)", "Unemployment (% of labor force)"],
+            "year": [2025, 2025],
+            "value": [1.33e12, 3.874],
+        }
+    )
+    return Result(df, source="World Bank (CC-BY 4.0)", meta={"country": "Netherlands"})
+
+
+def wb_compare() -> Result:
+    df = pd.DataFrame(
+        {"country": ["France", "Netherlands", "Germany"], "year": [2025] * 3, "value": [7.5, 3.9, 3.7]}
+    )
+    return Result(df, source="World Bank (CC-BY 4.0)", meta={"label": "Unemployment (% of labor force)"})
+
+
+def macro_app():
+    from macrocal.panels import render_macro_tab
+
+    render_macro_tab()
+
+
+def test_macro_tab_renders_us_series_country_compare_and_profile(monkeypatch):
+    monkeypatch.setattr(intel, "us_series", lambda s: series_result())
+    monkeypatch.setattr(intel, "compare_countries", lambda i, c: wb_compare())
+    monkeypatch.setattr(intel, "country_profile", lambda c: wb_profile())
+    at = AppTest.from_function(macro_app, default_timeout=30).run()
+    assert not at.exception
+    text = " ".join(c.value for c in at.caption)
+    assert "Bureau of Labor Statistics" in text
+    assert "World Bank" in text
+    assert any(m.label.startswith("Unemployment") for m in at.metric)
+
+
+def test_macro_tab_one_source_down_does_not_break_the_other(monkeypatch):
+    monkeypatch.setattr(intel, "us_series", lambda s: Result.fail("BLS is rate limiting", "economy-intel"))
+    monkeypatch.setattr(intel, "compare_countries", lambda i, c: wb_compare())
+    monkeypatch.setattr(intel, "country_profile", lambda c: wb_profile())
+    at = AppTest.from_function(macro_app, default_timeout=30).run()
+    assert not at.exception
+    assert any("rate limiting" in w.value for w in at.warning)
+    assert any("World Bank" in c.value for c in at.caption)
+
+
+def test_macro_tab_changing_indicator_refetches(monkeypatch):
+    seen = []
+
+    def compare(indicator, countries):
+        seen.append(indicator)
+        return wb_compare()
+
+    monkeypatch.setattr(intel, "us_series", lambda s: series_result())
+    monkeypatch.setattr(intel, "compare_countries", compare)
+    monkeypatch.setattr(intel, "country_profile", lambda c: wb_profile())
+    at = AppTest.from_function(macro_app, default_timeout=30).run()
+    at.selectbox(key="wb_indicator").select("inflation").run()
+    assert seen[0] == "unemployment"
+    assert seen[-1] == "inflation"

@@ -8,7 +8,7 @@ import streamlit as st
 
 import style
 from macrocal import events
-from macrocal.panels import render_event_context
+from macrocal.panels import render_event_context, render_macro_tab
 
 st.set_page_config(page_title="MacroCal", page_icon="📈", layout="wide")
 style.inject(st)
@@ -21,12 +21,11 @@ IMPACT_STYLE = {
     "LOW": f"background-color:{style.PALETTE['panel']};color:{style.PALETTE['text']}",
 }
 
-today = dt.date.today()  # noqa: DTZ011 - local date is right for a date picker default
-with st.sidebar:
-    st.header("Filters")
-    date_range = st.date_input("Date range", value=(today, today + dt.timedelta(days=7)))
-
-tab_calendar, tab_macro, tab_markets, tab_ask = st.tabs(["Calendar", "Macro", "Markets", "Ask"])
+VIEWS = ["Calendar", "Macro", "Markets", "Ask"]
+# One view runs per script run (st.tabs would run all four, hitting every data source on load).
+view = st.segmented_control(
+    "View", VIEWS, default=VIEWS[0], required=True, key="view", label_visibility="collapsed"
+)
 
 
 def render_event(event_id: str, name: str, currency: str) -> None:
@@ -57,6 +56,10 @@ def render_event_details(event_id: str) -> None:
 
 
 def render_calendar_tab() -> None:
+    today = dt.date.today()  # noqa: DTZ011 - local date is right for a date picker default
+    with st.sidebar:
+        st.header("Filters")
+        date_range = st.date_input("Date range", value=(today, today + dt.timedelta(days=7)))
     if len(date_range) != 2:
         st.info("Pick an end date to load the calendar.")
         return
@@ -101,11 +104,11 @@ def render_calendar_tab() -> None:
         st.info("Select a row in the table to see its details.")
 
 
-with tab_calendar:
+if view == "Calendar":
     render_calendar_tab()
-with tab_macro:
-    st.info("Macro: coming later.")
-with tab_markets:
+elif view == "Macro":
+    render_macro_tab()
+elif view == "Markets":
     st.info("Markets: coming later.")
-with tab_ask:
+else:
     st.info("Ask: coming later.")

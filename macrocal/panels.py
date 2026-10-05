@@ -10,6 +10,15 @@ from macrocal.context import context_stats
 from macrocal.mapping import series_for_event
 
 PRIMARY = "#008D7F"
+_MARGIN = {"l": 0, "r": 0, "t": 10, "b": 0}
+
+# Euronext home markets first, then the big economies people ask about.
+COUNTRY_CHOICES = {
+    "NLD": "Netherlands", "FRA": "France", "BEL": "Belgium", "PRT": "Portugal",
+    "IRL": "Ireland", "ITA": "Italy", "NOR": "Norway", "DEU": "Germany",
+    "ESP": "Spain", "GBR": "United Kingdom", "CHE": "Switzerland", "SWE": "Sweden",
+    "USA": "United States", "JPN": "Japan", "CHN": "China",
+}  # fmt: skip
 
 
 def _fmt(value: float | None) -> str:
@@ -25,20 +34,21 @@ def _fmt_delta(change: float | None, level: float) -> str | None:
     return f"{change:+,.0f}" if abs(level) >= 1000 else f"{change:+,.2f}"
 
 
-def render_event_context(name: str, currency: str | None) -> None:
-    """Macro series behind a calendar event, or a clear note when there is none."""
-    series = series_for_event(name, currency)
-    if series is None:
-        st.caption("No linked series for this event.")
-        return
+def _compact(value: float) -> str:
+    """1.33e12 -> '1.33T'. Short enough for a metric card."""
+    for limit, suffix in ((1e12, "T"), (1e9, "B"), (1e6, "M")):
+        if abs(value) >= limit:
+            return f"{value / limit:,.2f}{suffix}"
+    return _fmt(value)
 
+
+def _render_series(series: str, note: str = "") -> None:
     result = intel.us_series(series)
     if not result.ok:
         st.warning(result.error or "No data came back for this series.")
         return
 
     stats = context_stats(result.data)
-    st.markdown("#### Macro context")
     latest_col, prev_col, yoy_col = st.columns(3)
     delta = _fmt_delta(stats["change"], stats["latest"])
     latest_col.metric(f"Latest ({stats['latest_date']:%b %Y})", _fmt(stats["latest"]), delta=delta)
@@ -48,10 +58,85 @@ def render_event_context(name: str, currency: str | None) -> None:
 
     fig = px.line(result.data, x="date", y="value", markers=True)
     fig.update_traces(line_color=PRIMARY)
-    fig.update_layout(height=280, margin={"l": 0, "r": 0, "t": 10, "b": 0}, xaxis_title=None, yaxis_title=None)
+    fig.update_layout(height=280, margin=_MARGIN, xaxis_title=None, yaxis_title=None)
     st.plotly_chart(fig, width="stretch")
 
     st.caption(
-        f"{result.meta.get('label', series)} · source: {result.source} · as of {result.as_of}. "
-        "Shows the series level; the event's headline figure may be a % change."
+        f"{result.meta.get('label', series)} · source: {result.source} · as of {result.as_of}. {note}".strip()
     )
+
+
+def render_event_context(name: str, currency: str | None) -> None:
+    """Macro series behind a calendar event, or a clear note when there is none."""
+    series = series_for_event(name, currency)
+    if series is None:
+        st.caption("No linked series for this event.")
+        return
+    st.markdown("#### Macro context")
+    _render_series(series, note="Shows the series level; the event's headline figure may be a % change.")
+
+
+def _render_country_compare(indicator: str, countries: list[str]) -> None:
+    result = intel.compare_countries(indicator, countries)
+    if not result.ok:
+        st.warning(result.error or "No data came back for this comparison.")
+        return
+    fig = px.bar(result.data.iloc[::-1], x="value", y="country", orientation="h", text="value")
+    fig.update_traces(marker_color=PRIMARY, texttemplate="%{text:,.2f}")
+    fig.update_layout(height=60 + 40 * len(result.data), margin=_MARGIN, xaxis_title=None, yaxis_title=None)
+    st.plotly_chart(fig, width="stretch")
+    years = ", ".join(str(y) for y in sorted(result.data["year"].unique()))
+    st.caption(
+        f"{result.meta.get('label', indicator)} · source: {result.source} · latest year per country "
+        f"({years}); the newest World Bank year can be provisional."
+    )
+
+
+def _render_country_profile(country: str) -> None:
+    result = intel.country_profile(country)
+    if not result.ok:
+        st.warning(result.error or "No profile came back for this country.")
+        return
+    st.markdown(f"#### {result.meta.get('country', country)}")
+    rows = list(result.data.itertuples())
+    for start in range(0, len(rows), 3):
+        for col, row in zip(st.columns(3), rows[start : start + 3], strict=False):
+            col.metric(row.label, _compact(row.value), help=f"Year {row.year}")
+    st.caption(f"source: {result.source} · annual data, years differ by indicator.")
+
+
+def render_macro_tab() -> None:
+    st.subheader("United States (monthly)")
+    series = st.selectbox(
+        "Series", list(intel.US_SERIES), format_func=intel.US_SERIES.get, key="us_series_pick"
+    )
+    _render_series(series)
+
+    st.divider()
+    st.subheader("Countries (World Bank, annual)")
+    indicators = list(intel.WB_INDICATORS)
+    left, right = st.columns([1, 2])
+    indicator = left.selectbox(
+        "Indicator",
+        indicators,
+        index=indicators.index("unemployment"),
+        format_func=intel.WB_INDICATORS.get,
+        key="wb_indicator",
+    )
+    countries = right.multiselect(
+        "Countries",
+        list(COUNTRY_CHOICES),
+        default=["NLD", "DEU", "FRA"],
+        format_func=COUNTRY_CHOICES.get,
+        max_selections=intel.MAX_COUNTRIES,
+        key="wb_countries",
+    )
+    if not countries:
+        st.info("Pick at least one country.")
+        return
+    _render_country_compare(indicator, countries)
+
+    profile_country = st.selectbox(
+        "Country profile", countries, format_func=COUNTRY_CHOICES.get, key="wb_profile_country"
+    )
+    _render_country_profile(profile_country)

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import threading
 
 import pandas as pd
@@ -34,6 +35,26 @@ US_SERIES = {
     "us_ppi": "US PPI final demand, seasonally adjusted (index)",
     "us_retail_sales": "US advance retail & food services sales, SA (US$ millions)",
 }
+
+WB_INDICATORS = {
+    "gdp": "GDP (current US$)",
+    "gdp_per_capita": "GDP per capita (current US$)",
+    "gdp_growth": "GDP growth (annual %)",
+    "inflation": "Inflation, consumer prices (annual %)",
+    "population": "Population, total",
+    "unemployment": "Unemployment (% of labor force)",
+    "life_expectancy": "Life expectancy at birth (years)",
+    "exports": "Exports of goods & services (current US$)",
+    "imports": "Imports of goods & services (current US$)",
+    "govt_debt_pct_gdp": "Central govt debt (% of GDP)",
+    "real_interest_rate": "Real interest rate (%)",
+    "fdi": "Foreign direct investment, net inflows (US$)",
+    "co2_per_capita": "CO2 emissions per capita (t)",
+    "internet_users": "Individuals using the Internet (% pop)",
+}  # a test pins this to the server's own list_indicators reply, so drift is noticed
+WB_SOURCE = "World Bank (CC-BY 4.0)"
+MAX_COUNTRIES = 10
+_COUNTRY = re.compile(r"[A-Za-z][A-Za-z .'\-]{1,39}")  # ISO code or plain country name
 
 _MONTHS = {
     name: i
@@ -187,3 +208,89 @@ def _series_frame(points: list[dict]) -> pd.DataFrame:
         if p.get("value") not in (None, "", "-")
     ]
     return pd.DataFrame(rows, columns=["date", "value"]).sort_values("date").reset_index(drop=True)
+
+
+# --- World Bank (annual, lagging; latest year may be provisional) -----------------
+
+
+def _check_country(country: str) -> str | None:
+    if not isinstance(country, str) or not _COUNTRY.fullmatch(country.strip()):
+        return f"'{country}' is not a country code or name"
+    return None
+
+
+def _wb(tool: str, arguments: dict, build) -> Result:
+    """Run a World Bank tool and shape the payload with `build(payload) -> (frame, meta)`."""
+    try:
+        payload = _wb_raw(tool, json.dumps(arguments, sort_keys=True))
+        frame, meta = build(payload)
+    except (IntelError, KeyError, TypeError, ValueError) as exc:
+        return Result.fail(f"Could not load {tool}: {exc}", SOURCE)
+    return Result(frame, source=_clean(payload.get("source", WB_SOURCE)), meta=meta)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _wb_raw(tool: str, arguments_json: str) -> dict:
+    # Raises on failure so st.cache_data never caches an error.
+    return call_tool(tool, json.loads(arguments_json))
+
+
+def country_profile(country: str) -> Result:
+    """Latest value of each headline indicator for one country."""
+    if (problem := _check_country(country)) is not None:
+        return Result.fail(problem, SOURCE)
+
+    def build(payload: dict):
+        rows = [
+            (key, item["label"], int(item["year"]), float(item["value"]))
+            for key, item in payload["latest"].items()
+            if item.get("value") is not None
+        ]
+        return pd.DataFrame(rows, columns=["key", "label", "year", "value"]), {
+            "country": payload.get("country", country)
+        }
+
+    return _wb("country_profile", {"country": country.strip()}, build)
+
+
+def country_indicator(country: str, indicator: str, years: int = 12) -> Result:
+    """One indicator over time for one country, ascending by year."""
+    if (problem := _check_country(country)) is not None:
+        return Result.fail(problem, SOURCE)
+    if indicator not in WB_INDICATORS:
+        return Result.fail(f"Unknown indicator '{indicator}'", SOURCE)
+    if not 1 <= years <= 60:
+        return Result.fail("years must be between 1 and 60", SOURCE)
+
+    def build(payload: dict):
+        rows = [
+            (int(p["year"]), float(p["value"])) for p in payload["series"] if p.get("value") is not None
+        ]
+        frame = pd.DataFrame(rows, columns=["year", "value"]).sort_values("year").reset_index(drop=True)
+        return frame, {"label": payload.get("indicator", WB_INDICATORS[indicator]),
+                       "country": payload.get("country", country)}  # fmt: skip
+
+    return _wb("country_indicator", {"country": country.strip(), "indicator": indicator, "years": years}, build)
+
+
+def compare_countries(indicator: str, countries: list[str]) -> Result:
+    """One indicator across countries, in the server's ranking order (highest first)."""
+    if indicator not in WB_INDICATORS:
+        return Result.fail(f"Unknown indicator '{indicator}'", SOURCE)
+    if not 1 <= len(countries) <= MAX_COUNTRIES:
+        return Result.fail(f"Choose between 1 and {MAX_COUNTRIES} countries", SOURCE)
+    for country in countries:
+        if (problem := _check_country(country)) is not None:
+            return Result.fail(problem, SOURCE)
+
+    def build(payload: dict):
+        rows = [
+            (r["country"], int(r["year"]), float(r["value"]))
+            for r in payload["ranking"]
+            if r.get("value") is not None
+        ]
+        return pd.DataFrame(rows, columns=["country", "year", "value"]), {
+            "label": payload.get("indicator", WB_INDICATORS[indicator])
+        }
+
+    return _wb("compare_countries", {"indicator": indicator, "countries": [c.strip() for c in countries]}, build)
