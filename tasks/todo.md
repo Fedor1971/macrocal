@@ -3,11 +3,11 @@
 Plan: `plan.md`. Spec: `../SPEC.md`.
 
 ## Phase 1: Foundation and the core flow
-- [ ] T1 Scaffold (Result, config, style, vendor, hello app) · S/M
-- [ ] T2 Calendar slice: browse, filter, detail, export · M
-- [ ] T3 `economy-intel` client + `us_series` · S
-- [ ] T4 Event → macro context (mapping + panel) · S
-- [ ] **Checkpoint 1:** CPI event shows its series in a real browser; unmapped event shows a note
+- [x] T1 Scaffold (Result, config, style, vendor, hello app) · S/M
+- [x] T2 Calendar slice: browse, filter, detail, export · M
+- [x] T3 `economy-intel` client + `us_series` · S
+- [x] T4 Event → macro context (mapping + panel) · S
+- [x] **Checkpoint 1:** verified in a real browser 2026-10-05: USD Nonfarm Payrolls shows its series (event Actual +29k = series change +29), EUR "Consumer Price Index (YoY)" shows "No linked series". US CPI and Unemployment not in the visible window (CPI due ~Oct 14); covered by tests, recheck in the test phase
 
 ## Phase 2: Data tabs
 - [ ] T5 Macro tab: US series + World Bank · M

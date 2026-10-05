@@ -5,6 +5,17 @@ from macrocal import intel
 from macrocal.result import Result
 
 
+def test_number_format_keeps_large_values_short_enough_for_a_metric_card():
+    from macrocal.panels import _fmt, _fmt_delta
+
+    assert _fmt(159044.0) == "159,044"  # no ".00": long values were truncated in the card
+    assert _fmt(334.98) == "334.98"
+    assert _fmt(4.2) == "4.20"
+    assert _fmt(None) == "n/a"
+    assert _fmt_delta(29.0, 159044.0) == "+29"
+    assert _fmt_delta(-0.1, 4.2) == "-0.10"
+
+
 def series_result() -> Result:
     dates = pd.date_range("2024-10-01", periods=13, freq="MS")
     df = pd.DataFrame({"date": dates, "value": [4.1 + i * 0.01 for i in range(13)]})

@@ -51,15 +51,15 @@ Run from the project root with the project venv (global `streamlit` lacks deps).
 
 ```
 Setup:     py -3.13 -m venv .venv && .venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
-Dev:       .venv\Scripts\python.exe -m streamlit run app.py --server.port 8502 --server.address localhost
+Dev:       .venv\Scripts\python.exe -m streamlit run app.py --server.port 8510 --server.address localhost
 Test:      .venv\Scripts\python.exe -m pytest -q
 Test live: .venv\Scripts\python.exe -m pytest -q -m live      # hits real APIs, run manually
 Lint:      .venv\Scripts\python.exe -m ruff check . --fix
 Release:   .venv\Scripts\python.exe tools\make_release.py     # offline zip with wheels
-Local run: run.bat                                             # one-click, port 8502
+Local run: run.bat                                             # one-click, port 8510
 ```
 
-Port 8502 so it can run next to EcoCal (8501).
+Port 8510: your other local Streamlit apps already hold 8502 and 8503 (EcoCal's run.bat default is 8501), so MacroCal uses 8510.
 
 ## Project Structure
 

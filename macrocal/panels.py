@@ -13,7 +13,16 @@ PRIMARY = "#008D7F"
 
 
 def _fmt(value: float | None) -> str:
-    return "n/a" if value is None else f"{value:,.2f}"
+    if value is None:
+        return "n/a"
+    # Metric cards truncate long text ("159,04..."), so large levels drop their decimals.
+    return f"{value:,.0f}" if abs(value) >= 1000 else f"{value:,.2f}"
+
+
+def _fmt_delta(change: float | None, level: float) -> str | None:
+    if change is None:
+        return None
+    return f"{change:+,.0f}" if abs(level) >= 1000 else f"{change:+,.2f}"
 
 
 def render_event_context(name: str, currency: str | None) -> None:
@@ -31,7 +40,7 @@ def render_event_context(name: str, currency: str | None) -> None:
     stats = context_stats(result.data)
     st.markdown("#### Macro context")
     latest_col, prev_col, yoy_col = st.columns(3)
-    delta = None if stats["change"] is None else f"{stats['change']:+,.2f}"
+    delta = _fmt_delta(stats["change"], stats["latest"])
     latest_col.metric(f"Latest ({stats['latest_date']:%b %Y})", _fmt(stats["latest"]), delta=delta)
     prev_col.metric("Previous", _fmt(stats["previous"]))
     yoy = stats["yoy_pct"]
