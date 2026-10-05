@@ -2,7 +2,7 @@
 
 import pytest
 
-from macrocal import intel
+from macrocal import fred, intel
 
 pytestmark = pytest.mark.live
 
@@ -40,3 +40,11 @@ def test_intel_world_bank_loaders_live():
 def test_intel_wb_indicator_list_has_not_drifted_live():
     listed = intel.call_tool("list_indicators", {})["world_bank"]
     assert intel.WB_INDICATORS == listed
+
+
+@pytest.mark.skipif(not fred.available(), reason="needs FRED_API_KEY (free)")
+def test_fred_live():
+    r = fred.fred_series("FEDFUNDS")
+    assert r.ok, r.error
+    assert r.data["value"].between(0, 25).all()
+    assert "api_key" not in (r.error or "")

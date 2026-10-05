@@ -1,7 +1,8 @@
 import pandas as pd
+import pytest
 from streamlit.testing.v1 import AppTest
 
-from macrocal import intel
+from macrocal import fred, intel
 from macrocal.result import Result
 
 
@@ -146,3 +147,46 @@ def test_macro_tab_changing_indicator_refetches(monkeypatch):
     at.selectbox(key="wb_indicator").select("inflation").run()
     assert seen[0] == "unemployment"
     assert seen[-1] == "inflation"
+
+
+# --- FRED section (optional) ---------------------------------------------------------
+
+def fred_result() -> Result:
+    dates = pd.date_range("2025-08-01", periods=13, freq="MS")
+    df = pd.DataFrame({"date": dates, "value": [4.5 - i * 0.05 for i in range(13)]})
+    return Result(df, source=fred.SOURCE, as_of="2026-08-01", meta={"label": fred.SERIES["FEDFUNDS"]})
+
+
+def patch_other_macro_sources(monkeypatch):
+    monkeypatch.setattr(intel, "us_series", lambda s: series_result())
+    monkeypatch.setattr(intel, "compare_countries", lambda i, c: wb_compare())
+    monkeypatch.setattr(intel, "country_profile", lambda c: wb_profile())
+
+
+def test_fred_section_is_hidden_with_a_hint_when_no_key(monkeypatch):
+    patch_other_macro_sources(monkeypatch)
+    monkeypatch.setattr(fred, "fred_series", lambda s: pytest.fail("must not fetch without a key"))
+    at = AppTest.from_function(macro_app, default_timeout=30).run()
+    assert not at.exception
+    assert "fred_series_pick" not in [s.key for s in at.selectbox]
+    assert any("FRED_API_KEY" in c.value for c in at.caption)
+
+
+def test_fred_section_renders_when_a_key_exists(monkeypatch):
+    patch_other_macro_sources(monkeypatch)
+    monkeypatch.setenv("FRED_API_KEY", "k-for-test")
+    monkeypatch.setattr(fred, "fred_series", lambda s: fred_result())
+    at = AppTest.from_function(macro_app, default_timeout=30).run()
+    assert not at.exception
+    assert at.selectbox(key="fred_series_pick").value == "FEDFUNDS"
+    assert any("St. Louis" in c.value for c in at.caption)
+
+
+def test_fred_failure_is_a_warning_and_the_rest_of_the_tab_survives(monkeypatch):
+    patch_other_macro_sources(monkeypatch)
+    monkeypatch.setenv("FRED_API_KEY", "k-for-test")
+    monkeypatch.setattr(fred, "fred_series", lambda s: Result.fail("FRED returned HTTP 429", fred.SOURCE))
+    at = AppTest.from_function(macro_app, default_timeout=30).run()
+    assert not at.exception
+    assert any("HTTP 429" in w.value for w in at.warning)
+    assert any("World Bank" in c.value for c in at.caption)

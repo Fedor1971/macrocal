@@ -5,7 +5,7 @@ from __future__ import annotations
 import plotly.express as px
 import streamlit as st
 
-from macrocal import intel
+from macrocal import fred, intel
 from macrocal.context import context_stats
 from macrocal.mapping import series_for_event
 
@@ -42,19 +42,20 @@ def _compact(value: float) -> str:
     return _fmt(value)
 
 
-def _render_series(series: str, note: str = "") -> None:
-    result = intel.us_series(series)
+def _render_result(result, fallback_label: str, note: str = "", show_yoy: bool = True) -> None:
+    """Latest/previous/YoY cards, chart and provenance for any monthly-ish series Result."""
     if not result.ok:
         st.warning(result.error or "No data came back for this series.")
         return
 
     stats = context_stats(result.data)
-    latest_col, prev_col, yoy_col = st.columns(3)
+    columns = st.columns(3 if show_yoy else 2)
     delta = _fmt_delta(stats["change"], stats["latest"])
-    latest_col.metric(f"Latest ({stats['latest_date']:%b %Y})", _fmt(stats["latest"]), delta=delta)
-    prev_col.metric("Previous", _fmt(stats["previous"]))
-    yoy = stats["yoy_pct"]
-    yoy_col.metric("Year over year", "n/a" if yoy is None else f"{yoy:+.1f}%")
+    columns[0].metric(f"Latest ({stats['latest_date']:%b %Y})", _fmt(stats["latest"]), delta=delta)
+    columns[1].metric("Previous", _fmt(stats["previous"]))
+    if show_yoy:
+        yoy = stats["yoy_pct"]
+        columns[2].metric("Year over year", "n/a" if yoy is None else f"{yoy:+.1f}%")
 
     fig = px.line(result.data, x="date", y="value", markers=True)
     fig.update_traces(line_color=PRIMARY)
@@ -62,8 +63,13 @@ def _render_series(series: str, note: str = "") -> None:
     st.plotly_chart(fig, width="stretch")
 
     st.caption(
-        f"{result.meta.get('label', series)} · source: {result.source} · as of {result.as_of}. {note}".strip()
+        f"{result.meta.get('label', fallback_label)} · source: {result.source} · "
+        f"as of {result.as_of}. {note}".strip()
     )
+
+
+def _render_series(series: str, note: str = "") -> None:
+    _render_result(intel.us_series(series), series, note)
 
 
 def render_event_context(name: str, currency: str | None) -> None:
@@ -140,3 +146,16 @@ def render_macro_tab() -> None:
         "Country profile", countries, format_func=COUNTRY_CHOICES.get, key="wb_profile_country"
     )
     _render_country_profile(profile_country)
+
+    st.divider()
+    _render_fred_section()
+
+
+def _render_fred_section() -> None:
+    st.subheader("Rates and output (FRED)")
+    if not fred.available():
+        st.caption("Hidden: add a free FRED_API_KEY in the app secrets to enable this section.")
+        return
+    series = st.selectbox("FRED series", list(fred.SERIES), format_func=fred.SERIES.get, key="fred_series_pick")
+    # YoY % change of a rate or a spread is not meaningful, so only level and change are shown.
+    _render_result(fred.fred_series(series), series, show_yoy=False)
