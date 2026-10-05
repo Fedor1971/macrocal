@@ -38,7 +38,7 @@ CRISIS_WINDOWS = {
     "2022 inflation shock": ("2022-01-01", "2022-12-31"),
 }
 PRESETS = ["Last 1 year", "Last 5 years", *CRISIS_WINDOWS]
-_YIELD_KEYS = {"bond10y"}  # a % change of a rate is meaningless, so these use level changes
+YIELD_KEYS = {"bond10y"}  # a % change of a rate is meaningless, so these use level changes
 
 
 class MarketsError(Exception):
@@ -136,7 +136,7 @@ def returns(prices: pd.DataFrame) -> pd.DataFrame:
     """Daily % change; for yield series the daily change in percentage points."""
     values = prices.set_index("date")
     out = values.pct_change(fill_method=None) * 100
-    for key in _YIELD_KEYS & set(values.columns):
+    for key in YIELD_KEYS & set(values.columns):
         out[key] = values[key].diff()
     return out.iloc[1:].reset_index()
 
