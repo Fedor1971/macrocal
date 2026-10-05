@@ -8,6 +8,7 @@ import streamlit as st
 
 import style
 from macrocal import events
+from macrocal.panels import render_event_context
 
 st.set_page_config(page_title="MacroCal", page_icon="📈", layout="wide")
 style.inject(st)
@@ -28,8 +29,16 @@ with st.sidebar:
 tab_calendar, tab_macro, tab_markets, tab_ask = st.tabs(["Calendar", "Macro", "Markets", "Ask"])
 
 
-def render_event_details(event_id: str, name: str) -> None:
+def render_event(event_id: str, name: str, currency: str) -> None:
     st.subheader(name)
+    details_col, context_col = st.columns(2)
+    with details_col:
+        render_event_details(event_id)
+    with context_col:
+        render_event_context(name, currency)
+
+
+def render_event_details(event_id: str) -> None:
     details = events.fetch_event_details(event_id)
     if not details.ok:
         st.error(details.error)
@@ -87,7 +96,7 @@ def render_calendar_tab() -> None:
     rows = selection.selection.rows if selection and selection.selection else []
     if rows:
         row = filtered.iloc[rows[0]]
-        render_event_details(row["Id"], row["Name"])
+        render_event(row["Id"], row["Name"], row["Currency"])
     else:
         st.info("Select a row in the table to see its details.")
 
