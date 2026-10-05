@@ -130,3 +130,13 @@ def test_switching_to_markets_loads_only_the_markets_source(calls):
     assert not at.exception
     assert calls == ["fetch_prices"]
     assert len(at.get("plotly_chart")) == 2
+
+
+def test_ask_view_without_a_key_is_disabled_and_touches_no_data_source(calls):
+    at = run_app()
+    calls.clear()
+    at.segmented_control(key="view").set_value("Ask").run()
+    assert not at.exception
+    assert calls == []
+    assert any("GEMINI_API_KEY" in c.value for c in at.caption)
+    assert len(at.chat_input) == 0

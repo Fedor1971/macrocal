@@ -325,3 +325,115 @@ def test_index_series_year_over_year_stays_a_percent_change(monkeypatch):
 
 def test_the_rate_series_are_the_two_percentage_series():
     assert intel.RATE_SERIES == {"us_unemployment_rate", "us_labor_participation"}
+
+
+# --- Ask view ------------------------------------------------------------------------------
+
+
+from macrocal import bot
+
+
+class StubAnalyst:
+    """Stands in for bot.Analyst so the UI can be tested without Gemini."""
+
+    def __init__(self, answer=None):
+        self.questions: list[str] = []
+        self.answer = answer or bot.Answer(
+            text="US unemployment is 4.2% (us_series, BLS, as of 2026-10-05).",
+            tool_calls=[bot.ToolCall("us_series", {"series": "us_unemployment_rate"}, True)],
+        )
+
+    def ask(self, question, history, session):
+        self.questions.append(question)
+        return self.answer
+
+
+def ask_app():
+    from macrocal.panels import render_ask_tab
+
+    render_ask_tab()
+
+
+def test_ask_tab_is_disabled_with_instructions_when_there_is_no_key(monkeypatch):
+    monkeypatch.setattr(bot, "make_analyst", lambda: pytest.fail("must not build a client without a key"))
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    assert not at.exception
+    assert any("GEMINI_API_KEY" in c.value for c in at.caption)
+    assert len(at.chat_input) == 0
+
+
+def test_ask_tab_warns_about_sensitive_information_when_enabled(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k-for-test")
+    monkeypatch.setattr(bot, "make_analyst", lambda: StubAnalyst())
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    assert not at.exception
+    text = " ".join(c.value for c in at.caption)
+    assert "Google" in text and "sensitive" in text
+    assert len(at.chat_input) == 1
+
+
+def test_a_question_is_answered_with_tool_citations(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k-for-test")
+    stub = StubAnalyst()
+    monkeypatch.setattr(bot, "make_analyst", lambda: stub)
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    at.chat_input[0].set_value("What is US unemployment?").run()
+    assert not at.exception
+    assert stub.questions == ["What is US unemployment?"]
+    rendered = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
+    assert "4.2%" in rendered
+    assert "us_series" in rendered  # the tool that produced the figure is shown under the answer
+
+
+def test_a_failed_tool_is_marked_in_the_citations(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k-for-test")
+    failed = bot.Answer(text="No data right now.", tool_calls=[bot.ToolCall("us_series", {"series": "us_cpi"}, False)])
+    monkeypatch.setattr(bot, "make_analyst", lambda: StubAnalyst(failed))
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    at.chat_input[0].set_value("CPI?").run()
+    text = " ".join(c.value for c in at.caption)
+    assert "failed" in text.lower()
+
+
+def test_an_error_answer_is_shown_as_an_error_not_a_reply(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k-for-test")
+    capped = bot.Answer(error="Session limit reached (15 questions). Reload the page to start again.")
+    monkeypatch.setattr(bot, "make_analyst", lambda: StubAnalyst(capped))
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    at.chat_input[0].set_value("hello").run()
+    assert not at.exception
+    assert any("Session limit" in e.value for e in at.error)
+
+
+def test_history_is_kept_between_questions(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k-for-test")
+    seen = []
+
+    class Recording(StubAnalyst):
+        def ask(self, question, history, session):
+            seen.append(list(history))
+            return super().ask(question, history, session)
+
+    stub = Recording()
+    monkeypatch.setattr(bot, "make_analyst", lambda: stub)
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    at.chat_input[0].set_value("first").run()
+    at.chat_input[0].set_value("second").run()
+    assert seen[0] == []
+    assert [t["role"] for t in seen[1]] == ["user", "assistant"]
+    assert seen[1][0]["text"] == "first"
+
+
+def test_the_client_is_built_once_per_session_not_per_message(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k-for-test")
+    built = []
+
+    def make():
+        built.append(1)
+        return StubAnalyst()
+
+    monkeypatch.setattr(bot, "make_analyst", make)
+    at = AppTest.from_function(ask_app, default_timeout=30).run()
+    at.chat_input[0].set_value("a").run()
+    at.chat_input[0].set_value("b").run()
+    assert len(built) == 1

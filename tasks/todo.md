@@ -16,8 +16,8 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 - [x] **Checkpoint 2:** Macro and Markets verified in a real browser on live data (2026-10-05). "Source blocked" behaviour is covered by AppTest per view (calendar, macro, FRED, markets failures), not by blocking the network in the browser. Found and fixed: YoY for rate series now in percentage points. yfinance Python 3.14 (Streamlit Cloud) compat still to confirm at first deploy.
 
 ## Phase 3: AI bot
-- [ ] T8 Bot core: tools, validation, caps (no UI) · M
-- [ ] T9 Ask tab + Gemini wiring (live test needs `GEMINI_API_KEY`) · S
+- [x] T8 Bot core: tools, validation, caps (no UI) · M
+- [~] T9 Ask tab + Gemini wiring: UI and mocked tests done (214 pass); LIVE Gemini run blocked on GEMINI_API_KEY from Fedor; default model name unverified
 - [ ] **Checkpoint 3:** scripted Q&A verified (or flagged as waiting on the key)
 
 ## Phase 4: Ship-readiness

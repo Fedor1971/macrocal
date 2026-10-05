@@ -7,7 +7,7 @@ import datetime as dt
 import plotly.express as px
 import streamlit as st
 
-from macrocal import fred, intel, markets
+from macrocal import bot, fred, intel, markets
 from macrocal.context import context_stats
 from macrocal.mapping import series_for_event
 
@@ -228,3 +228,49 @@ def render_markets_tab() -> None:
         "the window. Correlations use daily returns; the 10-year yield uses daily changes in percentage "
         "points instead of % change."
     )
+
+
+def _citation(call) -> str:
+    return f"{call.name}" if call.ok else f"{call.name} (failed)"
+
+
+def _render_tools_used(tool_calls) -> None:
+    if tool_calls:
+        st.caption("Data used: " + ", ".join(_citation(c) for c in tool_calls))
+
+
+def render_ask_tab() -> None:
+    st.subheader("Ask the analyst")
+    if not bot.available():
+        st.caption("Disabled: add a GEMINI_API_KEY (Google AI Studio) in the app secrets to enable the analyst.")
+        return
+    st.caption(
+        "Answers come only from this app's own data, and the tools used are listed under each answer. "
+        "Your questions are sent to Google's Gemini API. On the free tier Google may use them to improve "
+        "its models, so do not enter sensitive information. Not investment advice."
+    )
+    if "analyst" not in st.session_state:
+        st.session_state["analyst"] = bot.make_analyst()
+    history = st.session_state.setdefault("ask_history", [])
+
+    for turn in history:
+        with st.chat_message(turn["role"]):
+            st.markdown(turn["text"])
+            _render_tools_used(turn.get("tools", []))
+
+    question = st.chat_input("Ask about the calendar, US data, countries or markets", max_chars=bot.MAX_QUESTION_CHARS)
+    if not question:
+        return
+    with st.chat_message("user"):
+        st.markdown(question)
+    with st.chat_message("assistant"), st.spinner("Looking at the data..."):
+        sent = [{"role": t["role"], "text": t["text"]} for t in history]
+        answer = st.session_state["analyst"].ask(question, sent, st.session_state)
+        if answer.error:
+            st.error(answer.error)
+            _render_tools_used(answer.tool_calls)
+            return
+        st.markdown(answer.text)
+        _render_tools_used(answer.tool_calls)
+    history.append({"role": "user", "text": question})
+    history.append({"role": "assistant", "text": answer.text, "tools": answer.tool_calls})

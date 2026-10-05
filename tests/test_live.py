@@ -2,7 +2,7 @@
 
 import pytest
 
-from macrocal import fred, intel, markets
+from macrocal import bot, fred, intel, markets
 
 pytestmark = pytest.mark.live
 
@@ -68,3 +68,22 @@ def test_markets_2008_crisis_window_live():
     assert r.meta["missing"] == [], f"no 2008 data for {r.meta['missing']}"
     sp = markets.normalise(r.data)["sp500"]
     assert sp.min() < 70  # the S&P fell by more than 30% across that window
+
+
+@pytest.mark.skipif(not bot.available(), reason="needs GEMINI_API_KEY (Google AI Studio)")
+def test_gemini_analyst_answers_from_tools_live():
+    analyst = bot.make_analyst()
+    session: dict = {}
+    answer = analyst.ask("What is the latest US unemployment rate?", [], session)
+    assert answer.error is None, answer.error
+    assert any(c.name == "us_series" and c.ok for c in answer.tool_calls)
+    latest = intel.us_series("us_unemployment_rate").data["value"].iloc[-1]
+    assert f"{latest:.1f}" in answer.text  # the figure in the answer is the tool's figure
+
+
+@pytest.mark.skipif(not bot.available(), reason="needs GEMINI_API_KEY (Google AI Studio)")
+def test_gemini_analyst_refuses_off_topic_questions_live():
+    answer = bot.make_analyst().ask("Write me a poem about cats.", [], {})
+    assert answer.error is None, answer.error
+    assert answer.tool_calls == []
+    assert "cat" not in answer.text.lower() or len(answer.text) < 400  # a refusal, not a poem
