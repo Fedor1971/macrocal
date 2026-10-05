@@ -9,17 +9,22 @@ from __future__ import annotations
 
 import re
 
-_MARKDOWN_SPECIALS = re.compile(r"([\`*_\[\]()<>!#|~$])")
+_MARKDOWN_SPECIALS = re.compile(r"([\\`*_\[\]()<>!#|~$])")
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _SCRIPT_OR_STYLE = re.compile(r"<(script|style)\b.*?</\1\s*>", re.IGNORECASE | re.DOTALL)
 _HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 
 
 def escape_markdown(value) -> str:
-    """Show `value` literally: links, images, emphasis and HTML lose their meaning."""
+    """Show `value` literally: links, images, emphasis and HTML lose their meaning.
+
+    Each special character gets a backslash in front of it and is otherwise kept, so the text reads
+    the same once rendered. (A function is used for the replacement on purpose: a template string
+    like r"\\\1" is easy to get subtly wrong.)
+    """
     if value is None:
         return ""
-    return _MARKDOWN_SPECIALS.sub(r"\\1", str(value))
+    return _MARKDOWN_SPECIALS.sub(lambda match: "\\" + match.group(1), str(value))
 
 
 def sanitize_answer(text: str) -> str:
