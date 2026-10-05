@@ -28,6 +28,10 @@ py -3.13 -m venv .venv
 
 Port 8510 avoids the other local Streamlit apps on this machine (8501-8503).
 
+**`ModuleNotFoundError: No module named 'plotly'`?** A bare `streamlit run app.py` uses whatever Python
+is first on your PATH, not this project's `.venv`. Start it with the venv's Python as shown above, or
+double-click `run.bat`, which always uses the project's own environment.
+
 ### One-click (Windows, for colleagues)
 
 Unzip a release folder and double-click **`run.bat`**. The first start builds a private `.venv`
