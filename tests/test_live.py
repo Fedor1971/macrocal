@@ -2,7 +2,7 @@
 
 import pytest
 
-from macrocal import bot, fred, intel, markets
+from macrocal import bot, events, fred, intel, markets
 
 pytestmark = pytest.mark.live
 
@@ -87,3 +87,16 @@ def test_gemini_analyst_refuses_off_topic_questions_live():
     assert answer.error is None, answer.error
     assert answer.tool_calls == []
     assert "cat" not in answer.text.lower() or len(answer.text) < 400  # a refusal, not a poem
+
+
+def test_calendar_live():
+    import datetime as dt
+
+    today = dt.date.today()  # noqa: DTZ011
+    r = events.fetch_calendar(today.isoformat(), (today + dt.timedelta(days=7)).isoformat())
+    assert r.ok, r.error
+    assert {"Id", "Start", "Name", "Impact", "Currency"} <= set(r.data.columns)
+    first = r.data.iloc[0]["Id"]
+    details = events.fetch_event_details(first)
+    assert details.ok, details.error
+    assert "countryCode" in details.data

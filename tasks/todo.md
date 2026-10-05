@@ -18,12 +18,12 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 ## Phase 3: AI bot
 - [x] T8 Bot core: tools, validation, caps (no UI) · M
 - [~] T9 Ask tab + Gemini wiring: UI and mocked tests done (214 pass); LIVE Gemini run blocked on GEMINI_API_KEY from Fedor; default model name unverified
-- [ ] **Checkpoint 3:** scripted Q&A verified (or flagged as waiting on the key)
+- [~] **Checkpoint 3:** bot logic + UI verified with a fake client (mutation-checked); scripted live Q&A BLOCKED on GEMINI_API_KEY
 
 ## Phase 4: Ship-readiness
 - [x] T10 Degradation states, run.bat, offline release: clean-room offline install verified 2026-10-05 (no-index install, vendored ecocal loads, 157 live events, health ok)
-- [ ] T11 README, secrets example, live smoke tests · S
-- [ ] **Checkpoint 4:** SPEC success criteria 1–6 and 8 met
+- [x] T11 README, secrets example, live smoke tests (calendar, intel, World Bank, markets pass live; FRED + Gemini skip without keys)
+- [~] **Checkpoint 4:** criteria 1-6,8 partly met: see "Open before ship" below
 
 ## Then
 - [ ] Test phase · [ ] Review phase · [ ] Ship gate (secret scan → public repo → Cloud → verify EcoCal → vault save)
@@ -31,3 +31,10 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 ## Waiting on Fedor
 - [ ] `GEMINI_API_KEY` from Google AI Studio (before T9 live test)
 - [ ] Optional `FRED_API_KEY`
+
+## Open before ship (as of 2026-10-05, after T11)
+- [ ] Fedor: create `GEMINI_API_KEY` (Google AI Studio) -> run `pytest -m live`, 5 scripted Ask questions, confirm/replace the default model name
+- [ ] Run the real `run.bat` from the offline zip (only its steps were verified by hand in a clean room), view in browser
+- [ ] Browser-recheck US CPI + Unemployment event context (not in the visible window on 2026-10-05)
+- [ ] Test phase (full suite + live), review phase (security: secrets, prompt injection via tool output, quota abuse), then ship gate
+- [ ] Ship: secret scan of full history -> public repo -> Streamlit Cloud (check yfinance on its Python) -> confirm ecocal-dashboard still loads -> /obsidian-save
