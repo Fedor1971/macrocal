@@ -8,7 +8,7 @@ import pytest
 from macrocal import bot, events, fred, intel, markets
 from macrocal.result import Result
 
-SECRET = "AIza-test-secret-key-0123456789"
+SECRET = "FAKE-gemini-key-for-tests-0123456789"
 
 
 # --- fakes ----------------------------------------------------------------------------

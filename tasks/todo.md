@@ -34,7 +34,7 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 
 ## Open before ship (as of 2026-10-05, after T11)
 - [ ] Fedor: create `GEMINI_API_KEY` (Google AI Studio) -> run `pytest -m live`, 5 scripted Ask questions, confirm/replace the default model name
-- [ ] Run the real `run.bat` from the offline zip (only its steps were verified by hand in a clean room), view in browser
-- [ ] Browser-recheck US CPI + Unemployment event context (not in the visible window on 2026-10-05)
-- [ ] Test phase (full suite + live), review phase (security: secrets, prompt injection via tool output, quota abuse), then ship gate
+- [x] Real `run.bat` run from the offline zip (2026-10-05): created the venv, installed offline, healthy app on 8510. Launch it as `.\run.bat`: this machine sets NoDefaultCurrentDirectoryInExePath=1, so a bare `run.bat` typed in a shell is not found (double-click is fine).
+- [x] US CPI, Unemployment, PPI, retail sales, participation, earnings and payrolls context verified on real data via AppTest (core CPI unmapped as designed); real-browser pass earlier on payrolls and EUR CPI.
+- [x] Test + review phases done 2026-10-05: 237 offline tests, 7 live pass; review found no Critical and 6 Important, all fixed in 4bd71fd. Git history scanned: no real secrets (only a fake test key, since renamed).
 - [ ] Ship: secret scan of full history -> public repo -> Streamlit Cloud (check yfinance on its Python) -> confirm ecocal-dashboard still loads -> /obsidian-save
