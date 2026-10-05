@@ -3,20 +3,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-import pandas as pd
+from typing import Any
 
 
 @dataclass(frozen=True)
 class Result:
-    data: pd.DataFrame | None
+    data: Any = None  # a DataFrame for series/tables, a dict for single-record payloads
     error: str | None = None
     source: str = ""
     as_of: str = ""  # data date as reported by the source, not "now"
 
     @property
     def ok(self) -> bool:
-        return self.error is None and self.data is not None and not self.data.empty
+        return self.error is None and self.data is not None and len(self.data) > 0
 
     @classmethod
     def fail(cls, error: str, source: str = "") -> Result:

@@ -18,6 +18,11 @@ def test_result_with_empty_frame_is_not_ok():
     assert not Result(pd.DataFrame()).ok
 
 
+def test_result_with_dict_payload_is_ok():
+    assert Result({"actual": 1}).ok
+    assert not Result({}).ok
+
+
 def test_result_is_immutable():
     r = Result(None, error="x")
     try:
