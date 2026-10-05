@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = ["live: hits real third-party APIs; run manually with -m live"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["vendor"]

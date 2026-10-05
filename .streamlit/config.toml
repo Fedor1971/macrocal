@@ -1,0 +1,18 @@
+[theme]
+base = "light"
+primaryColor = "#008D7F"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F3F3"
+textColor = "#252631"
+font = "sans serif"
+
+[server]
+# Binding address/port are set per-launch: run.bat passes --server.address localhost
+# (local-only), and Streamlit Community Cloud needs to manage them itself.
+headless = true
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
