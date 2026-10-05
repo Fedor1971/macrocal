@@ -21,6 +21,7 @@ def build_tree(root: Path) -> None:
         "run.bat": "",
         "requirements.txt": "",
         "README.md": "",
+        "LICENSE": "",
         "SPEC.md": "",
         "macrocal/__init__.py": "",
         "macrocal/bot.py": "",
@@ -47,7 +48,7 @@ def build_tree(root: Path) -> None:
 def test_release_contains_the_app_package_and_vendored_ecocal(release, tmp_path):
     build_tree(tmp_path)
     names = {p.as_posix() for p in release.release_files(tmp_path)}
-    assert {"app.py", "style.py", "run.bat", "requirements.txt", "README.md"} <= names
+    assert {"app.py", "style.py", "run.bat", "requirements.txt", "README.md", "LICENSE"} <= names
     assert {"macrocal/__init__.py", "macrocal/bot.py"} <= names
     assert {"vendor/ecocal/Calendar.py", "vendor/ecocal/LICENSE"} <= names
     assert ".streamlit/config.toml" in names

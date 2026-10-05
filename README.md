@@ -113,3 +113,7 @@ Layout: `app.py` (view switcher), `macrocal/` (`events`, `intel`, `fred`, `marke
 `context`, `bot`, `panels`, `result`, `config`), `tests/`, `tools/make_release.py`, `vendor/ecocal/`.
 Every loader returns a `Result(data, error, source, as_of)` so views can degrade without try/except
 in UI code. See `SPEC.md` for the design and `tasks/` for the plan.
+
+## License
+
+MIT, see `LICENSE`. The vendored `vendor/ecocal/` keeps its own MIT license.

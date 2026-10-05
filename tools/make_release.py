@@ -21,7 +21,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TOP_FILES = ["app.py", "style.py", "run.bat", "requirements.txt", "README.md"]
+TOP_FILES = ["app.py", "style.py", "run.bat", "requirements.txt", "README.md", "LICENSE"]
 STREAMLIT_FILES = [".streamlit/config.toml", ".streamlit/secrets.toml.example"]
 PACKAGE_DIRS = ["macrocal", "vendor"]  # vendor/ecocal is the vendored calendar library (MIT)
 SECRET_FILES = [".env", ".streamlit/secrets.toml"]
