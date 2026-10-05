@@ -8,7 +8,7 @@ import streamlit as st
 
 import style
 from macrocal import events
-from macrocal.panels import render_event_context, render_macro_tab
+from macrocal.panels import render_event_context, render_macro_tab, render_markets_tab
 
 st.set_page_config(page_title="MacroCal", page_icon="📈", layout="wide")
 style.inject(st)
@@ -109,6 +109,6 @@ if view == "Calendar":
 elif view == "Macro":
     render_macro_tab()
 elif view == "Markets":
-    st.info("Markets: coming later.")
+    render_markets_tab()
 else:
     st.info("Ask: coming later.")

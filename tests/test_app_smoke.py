@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from macrocal import events, intel
+from macrocal import events, intel, markets
 from macrocal.result import Result
 
 APP = str(Path(__file__).resolve().parent.parent / "app.py")
@@ -52,6 +52,13 @@ def calls(monkeypatch):
         meta={"country": "Netherlands"},
     )
 
+    prices = Result(
+        pd.DataFrame({"date": pd.bdate_range("2026-01-01", periods=60), "sp500": range(60), "gold": range(60)}),
+        source=markets.SOURCE,
+        as_of="2026-03-24",
+        meta={"missing": [], "labels": {"sp500": "S&P 500", "gold": "Gold futures"}},
+    )
+
     def raw(start, end):
         seen.append("calendar")
         return fake_raw(start, end)
@@ -60,6 +67,7 @@ def calls(monkeypatch):
     monkeypatch.setattr(intel, "us_series", fake("us_series", series))
     monkeypatch.setattr(intel, "compare_countries", fake("compare_countries", compare))
     monkeypatch.setattr(intel, "country_profile", fake("country_profile", profile))
+    monkeypatch.setattr(markets, "fetch_prices", fake("fetch_prices", prices))
     return seen
 
 
@@ -113,3 +121,12 @@ def test_calendar_failure_shows_error_and_keeps_the_view_switcher(calls, monkeyp
     assert not at.exception
     assert any("fxstreet down" in e.value for e in at.error)
     assert list(at.segmented_control(key="view").options) == VIEWS
+
+
+def test_switching_to_markets_loads_only_the_markets_source(calls):
+    at = run_app()
+    calls.clear()
+    at.segmented_control(key="view").set_value("Markets").run()
+    assert not at.exception
+    assert calls == ["fetch_prices"]
+    assert len(at.get("plotly_chart")) == 2

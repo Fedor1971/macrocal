@@ -1,8 +1,11 @@
+import datetime as dt
+
+import numpy as np
 import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from macrocal import fred, intel
+from macrocal import fred, intel, markets
 from macrocal.result import Result
 
 
@@ -190,3 +193,104 @@ def test_fred_failure_is_a_warning_and_the_rest_of_the_tab_survives(monkeypatch)
     assert not at.exception
     assert any("HTTP 429" in w.value for w in at.warning)
     assert any("World Bank" in c.value for c in at.caption)
+
+
+# --- Markets view -----------------------------------------------------------------------
+
+
+def markets_result(keys, missing=()) -> Result:
+    rng = np.random.default_rng(3)
+    n = 80
+    frame = pd.DataFrame({"date": pd.bdate_range("2026-01-01", periods=n)})
+    for k in keys:
+        frame[k] = 100 + np.cumsum(rng.normal(0, 1, n))
+    return Result(
+        frame,
+        source=markets.SOURCE,
+        as_of="2026-04-21",
+        meta={"missing": list(missing), "labels": {k: markets.ASSETS[k][1] for k in keys}},
+    )
+
+
+def markets_app():
+    from macrocal.panels import render_markets_tab
+
+    render_markets_tab()
+
+
+def test_markets_view_shows_normalised_chart_heatmap_and_provenance(monkeypatch):
+    monkeypatch.setattr(markets, "fetch_prices", lambda keys, s, e: markets_result(keys))
+    at = AppTest.from_function(markets_app, default_timeout=30).run()
+    assert not at.exception
+    assert len(at.get("plotly_chart")) == 2
+    text = " ".join(c.value for c in at.caption)
+    assert "Yahoo Finance" in text
+    assert "2026-04-21" in text
+
+
+def test_markets_default_window_is_the_last_year_ending_today(monkeypatch):
+    seen = []
+
+    def fetch(keys, start, end):
+        seen.append((start, end))
+        return markets_result(keys)
+
+    monkeypatch.setattr(markets, "fetch_prices", fetch)
+    AppTest.from_function(markets_app, default_timeout=30).run()
+    start, end = seen[0]
+    assert end == dt.date.today().isoformat()  # noqa: DTZ011
+    assert start < end
+
+
+def test_choosing_a_crisis_preset_requests_exactly_that_window(monkeypatch):
+    seen = []
+
+    def fetch(keys, start, end):
+        seen.append((start, end))
+        return markets_result(keys)
+
+    monkeypatch.setattr(markets, "fetch_prices", fetch)
+    at = AppTest.from_function(markets_app, default_timeout=30).run()
+    at.selectbox(key="mk_preset").select("COVID-19 crash 2020").run()
+    assert seen[-1] == markets.CRISIS_WINDOWS["COVID-19 crash 2020"]
+
+
+def test_markets_source_failure_is_a_warning(monkeypatch):
+    failure = Result.fail("Yahoo Finance request failed (HTTPError)", markets.SOURCE)
+    monkeypatch.setattr(markets, "fetch_prices", lambda k, s, e: failure)
+    at = AppTest.from_function(markets_app, default_timeout=30).run()
+    assert not at.exception
+    assert any("request failed" in w.value for w in at.warning)
+
+
+def test_assets_without_data_are_named_in_a_warning(monkeypatch):
+    monkeypatch.setattr(
+        markets, "fetch_prices", lambda keys, s, e: markets_result(["sp500", "gold"], missing=["oil"])
+    )
+    at = AppTest.from_function(markets_app, default_timeout=30).run()
+    assert not at.exception
+    assert any("WTI crude oil futures" in w.value for w in at.warning)
+
+
+def test_clearing_the_asset_selection_asks_for_one_and_fetches_nothing_more(monkeypatch):
+    fetches = []
+
+    def fetch(keys, start, end):
+        fetches.append(list(keys))
+        return markets_result(keys)
+
+    monkeypatch.setattr(markets, "fetch_prices", fetch)
+    at = AppTest.from_function(markets_app, default_timeout=30).run()
+    assert len(fetches) == 1
+    at.multiselect(key="mk_assets").set_value([]).run()
+    assert len(fetches) == 1
+    assert any("at least one asset" in i.value for i in at.info)
+
+
+def test_one_asset_shows_the_chart_but_explains_why_there_is_no_heatmap(monkeypatch):
+    monkeypatch.setattr(markets, "fetch_prices", lambda keys, s, e: markets_result(keys))
+    at = AppTest.from_function(markets_app, default_timeout=30).run()
+    at.multiselect(key="mk_assets").set_value(["sp500"]).run()
+    assert not at.exception
+    assert len(at.get("plotly_chart")) == 1
+    assert any("two or more" in i.value for i in at.info)

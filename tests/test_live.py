@@ -2,7 +2,7 @@
 
 import pytest
 
-from macrocal import fred, intel
+from macrocal import fred, intel, markets
 
 pytestmark = pytest.mark.live
 
@@ -48,3 +48,23 @@ def test_fred_live():
     assert r.ok, r.error
     assert r.data["value"].between(0, 25).all()
     assert "api_key" not in (r.error or "")
+
+
+def test_markets_all_assets_recent_window_live():
+    keys = list(markets.ASSETS)
+    r = markets.fetch_prices(keys, "2026-08-01", "2026-09-30")
+    assert r.ok, r.error
+    assert r.meta["missing"] == []
+    assert len(r.data) >= 30
+    assert r.data["bond10y"].dropna().between(0.5, 15).all()  # percent, not yield x 10; NaN = US holiday
+    corr = markets.correlation(r.data)
+    assert corr.shape == (6, 6)
+
+
+def test_markets_2008_crisis_window_live():
+    start, end = markets.CRISIS_WINDOWS["Global financial crisis 2008"]
+    r = markets.fetch_prices(list(markets.ASSETS), start, end)
+    assert r.ok, r.error
+    assert r.meta["missing"] == [], f"no 2008 data for {r.meta['missing']}"
+    sp = markets.normalise(r.data)["sp500"]
+    assert sp.min() < 70  # the S&P fell by more than 30% across that window

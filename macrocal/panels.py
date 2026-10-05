@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 import plotly.express as px
 import streamlit as st
 
-from macrocal import fred, intel
+from macrocal import fred, intel, markets
 from macrocal.context import context_stats
 from macrocal.mapping import series_for_event
 
@@ -159,3 +161,60 @@ def _render_fred_section() -> None:
     series = st.selectbox("FRED series", list(fred.SERIES), format_func=fred.SERIES.get, key="fred_series_pick")
     # YoY % change of a rate or a spread is not meaningful, so only level and change are shown.
     _render_result(fred.fred_series(series), series, show_yoy=False)
+
+
+def render_markets_tab() -> None:
+    st.subheader("Markets")
+    labels = {key: asset[1] for key, asset in markets.ASSETS.items()}
+    keys = st.multiselect(
+        "Assets", list(markets.ASSETS), default=list(markets.ASSETS), format_func=labels.get, key="mk_assets"
+    )
+    left, right = st.columns([1, 2])
+    preset = left.selectbox("Window", [*markets.PRESETS, "Custom"], key="mk_preset")
+    today = dt.date.today()  # noqa: DTZ011 - local date is right for a window default
+    if preset == "Custom":
+        picked = right.date_input("Dates", value=(today - dt.timedelta(days=365), today), key="mk_dates")
+        if len(picked) != 2:
+            st.info("Pick an end date.")
+            return
+        start, end = (d.isoformat() for d in picked)
+    else:
+        start, end = markets.preset_window(preset, today)
+        right.caption(f"{start} to {end}")
+
+    if not keys:
+        st.info("Pick at least one asset.")
+        return
+    result = markets.fetch_prices(keys, start, end)
+    if not result.ok:
+        st.warning(result.error or "No market data came back.")
+        return
+    if result.meta["missing"]:
+        names = ", ".join(labels[k] for k in result.meta["missing"])
+        st.warning(f"Yahoo Finance had no data for: {names}")
+
+    shown = [c for c in result.data.columns if c != "date"]
+    normalised = markets.normalise(result.data).melt(id_vars="date", var_name="asset", value_name="index")
+    normalised["asset"] = normalised["asset"].map(labels)
+    line = px.line(normalised, x="date", y="index", color="asset")
+    line.update_traces(connectgaps=True)  # assets trade on different calendars, so NaN gaps are normal
+    line.update_layout(height=380, margin=_MARGIN, xaxis_title=None, yaxis_title="Rebased to 100")
+    st.plotly_chart(line, width="stretch")
+
+    if len(shown) < 2:
+        st.info("Select two or more assets to see correlations.")
+    else:
+        corr = markets.correlation(result.data)
+        if corr.isna().all().all():
+            st.info(f"Not enough overlapping trading days for correlations (need {markets.MIN_OVERLAP}+).")
+        else:
+            corr = corr.rename(index=labels, columns=labels)
+            heat = px.imshow(corr, text_auto=".2f", zmin=-1, zmax=1, color_continuous_scale="RdBu_r")
+            heat.update_layout(height=420, margin=_MARGIN)
+            st.plotly_chart(heat, width="stretch")
+
+    st.caption(
+        f"source: {result.source} · as of {result.as_of}. Prices rebased to 100 at each asset's first day in "
+        "the window. Correlations use daily returns; the 10-year yield uses daily changes in percentage "
+        "points instead of % change."
+    )
