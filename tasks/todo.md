@@ -21,7 +21,7 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 - [ ] **Checkpoint 3:** scripted Q&A verified (or flagged as waiting on the key)
 
 ## Phase 4: Ship-readiness
-- [ ] T10 Degradation states, `run.bat`, offline release · M
+- [x] T10 Degradation states, run.bat, offline release: clean-room offline install verified 2026-10-05 (no-index install, vendored ecocal loads, 157 live events, health ok)
 - [ ] T11 README, secrets example, live smoke tests · S
 - [ ] **Checkpoint 4:** SPEC success criteria 1–6 and 8 met
 
