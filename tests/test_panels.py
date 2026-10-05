@@ -294,3 +294,34 @@ def test_one_asset_shows_the_chart_but_explains_why_there_is_no_heatmap(monkeypa
     assert not at.exception
     assert len(at.get("plotly_chart")) == 1
     assert any("two or more" in i.value for i in at.info)
+
+
+# --- rate series show percentage points, not a relative % change -------------------------
+
+
+def cpi_app():
+    from macrocal.panels import render_event_context
+
+    render_event_context("Consumer Price Index (YoY)", "USD")
+
+
+def yoy_value(at) -> str:
+    return next(m.value for m in at.metric if m.label == "Year over year")
+
+
+def test_rate_series_year_over_year_is_in_percentage_points(monkeypatch):
+    # unemployment 4.1 a year ago -> 4.2 now: "+0.1 pp", not a misleading "+2.4%"
+    monkeypatch.setattr(intel, "us_series", lambda s: series_result())
+    at = AppTest.from_function(panel_app).run()
+    assert yoy_value(at).endswith("pp")
+
+
+def test_index_series_year_over_year_stays_a_percent_change(monkeypatch):
+    monkeypatch.setattr(intel, "us_series", lambda s: series_result())
+    at = AppTest.from_function(cpi_app).run()
+    assert yoy_value(at).endswith("%")
+    assert "pp" not in yoy_value(at)
+
+
+def test_the_rate_series_are_the_two_percentage_series():
+    assert intel.RATE_SERIES == {"us_unemployment_rate", "us_labor_participation"}

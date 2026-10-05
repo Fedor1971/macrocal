@@ -36,6 +36,15 @@ def _fmt_delta(change: float | None, level: float) -> str | None:
     return f"{change:+,.0f}" if abs(level) >= 1000 else f"{change:+,.2f}"
 
 
+def _fmt_yoy(stats: dict, rate: bool) -> str:
+    """Rates (already in %) move in percentage points; levels and indexes in relative %."""
+    if rate:
+        change = stats["yoy_change"]
+        return "n/a" if change is None else f"{change:+.1f} pp"
+    pct = stats["yoy_pct"]
+    return "n/a" if pct is None else f"{pct:+.1f}%"
+
+
 def _compact(value: float) -> str:
     """1.33e12 -> '1.33T'. Short enough for a metric card."""
     for limit, suffix in ((1e12, "T"), (1e9, "B"), (1e6, "M")):
@@ -44,7 +53,9 @@ def _compact(value: float) -> str:
     return _fmt(value)
 
 
-def _render_result(result, fallback_label: str, note: str = "", show_yoy: bool = True) -> None:
+def _render_result(
+    result, fallback_label: str, note: str = "", show_yoy: bool = True, rate: bool = False
+) -> None:
     """Latest/previous/YoY cards, chart and provenance for any monthly-ish series Result."""
     if not result.ok:
         st.warning(result.error or "No data came back for this series.")
@@ -56,8 +67,7 @@ def _render_result(result, fallback_label: str, note: str = "", show_yoy: bool =
     columns[0].metric(f"Latest ({stats['latest_date']:%b %Y})", _fmt(stats["latest"]), delta=delta)
     columns[1].metric("Previous", _fmt(stats["previous"]))
     if show_yoy:
-        yoy = stats["yoy_pct"]
-        columns[2].metric("Year over year", "n/a" if yoy is None else f"{yoy:+.1f}%")
+        columns[2].metric("Year over year", _fmt_yoy(stats, rate))
 
     fig = px.line(result.data, x="date", y="value", markers=True)
     fig.update_traces(line_color=PRIMARY)
@@ -71,7 +81,7 @@ def _render_result(result, fallback_label: str, note: str = "", show_yoy: bool =
 
 
 def _render_series(series: str, note: str = "") -> None:
-    _render_result(intel.us_series(series), series, note)
+    _render_result(intel.us_series(series), series, note, rate=series in intel.RATE_SERIES)
 
 
 def render_event_context(name: str, currency: str | None) -> None:

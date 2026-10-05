@@ -56,6 +56,10 @@ WB_SOURCE = "World Bank (CC-BY 4.0)"
 MAX_COUNTRIES = 10
 _COUNTRY = re.compile(r"[A-Za-z][A-Za-z .'\-]{1,39}")  # ISO code or plain country name
 
+# Series already measured in percent: a year-over-year move is shown in percentage points, not as
+# a relative % change of a percentage (4.4% -> 4.2% is -0.2 pp, not "-4.5%").
+RATE_SERIES = {"us_unemployment_rate", "us_labor_participation"}
+
 _MONTHS = {
     name: i
     for i, name in enumerate(

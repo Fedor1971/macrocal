@@ -10,10 +10,10 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 - [x] **Checkpoint 1:** verified in a real browser 2026-10-05: USD Nonfarm Payrolls shows its series (event Actual +29k = series change +29), EUR "Consumer Price Index (YoY)" shows "No linked series". US CPI and Unemployment not in the visible window (CPI due ~Oct 14); covered by tests, recheck in the test phase
 
 ## Phase 2: Data tabs
-- [ ] T5 Macro tab: US series + World Bank · M
-- [ ] T6 FRED optional section · S
-- [ ] T7 Markets tab (+ yfinance compat check) · M
-- [ ] **Checkpoint 2:** every tab works alone with other sources blocked
+- [x] T5 Macro tab: US series + World Bank · M
+- [x] T6 FRED optional section · S
+- [x] T7 Markets tab (+ yfinance compat check) · M
+- [x] **Checkpoint 2:** Macro and Markets verified in a real browser on live data (2026-10-05). "Source blocked" behaviour is covered by AppTest per view (calendar, macro, FRED, markets failures), not by blocking the network in the browser. Found and fixed: YoY for rate series now in percentage points. yfinance Python 3.14 (Streamlit Cloud) compat still to confirm at first deploy.
 
 ## Phase 3: AI bot
 - [ ] T8 Bot core: tools, validation, caps (no UI) · M

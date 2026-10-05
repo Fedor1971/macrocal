@@ -49,3 +49,14 @@ def test_previous_is_the_prior_available_point_even_across_a_gap():
 def test_zero_previous_does_not_divide_by_zero():
     stats = context_stats(monthly([0.0, 5.0]))
     assert stats["pct_change"] is None
+
+
+def test_yoy_change_is_the_absolute_difference_to_the_year_ago_month():
+    values = [4.4] + [0.0] * 11 + [4.2]  # Jan 2025 -> Jan 2026
+    stats = context_stats(monthly(values))
+    assert stats["yoy_change"] == pytest.approx(-0.2)
+    assert stats["yoy_pct"] == pytest.approx(-4.545, abs=0.01)
+
+
+def test_yoy_change_is_none_without_a_year_ago_point():
+    assert context_stats(monthly([1.0, 2.0]))["yoy_change"] is None

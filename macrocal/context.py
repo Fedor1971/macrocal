@@ -20,6 +20,7 @@ def context_stats(df: pd.DataFrame) -> dict:
         "change": None,
         "pct_change": None,
         "yoy_pct": None,
+        "yoy_change": None,
     }
     if len(df) >= 2:
         previous = float(df.iloc[-2]["value"])
@@ -31,6 +32,7 @@ def context_stats(df: pd.DataFrame) -> dict:
     year_ago = df[df["date"] == latest_row["date"] - pd.DateOffset(years=1)]
     if not year_ago.empty:
         base = float(year_ago.iloc[0]["value"])
+        stats["yoy_change"] = latest - base
         if base != 0:
             stats["yoy_pct"] = (latest - base) / abs(base) * 100
     return stats
