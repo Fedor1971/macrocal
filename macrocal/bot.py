@@ -29,8 +29,9 @@ from macrocal import events, fred, intel, markets
 from macrocal.config import get_secret
 from macrocal.text import sanitize_answer
 
-# Not verifiable without a key (checked against third-party pages only, 2026-10-05).
-# Override with the GEMINI_MODEL secret; confirm with a live call once a key exists.
+# Verified live on 2026-10-05: listed by the API for the project's key, and it passed the live
+# tool-calling and refusal tests (so did gemini-3.5-flash, gemini-3.8-flash, gemini-flash-latest).
+# A stable GA name is the default; override with the GEMINI_MODEL secret (full model name).
 DEFAULT_MODEL = "gemini-2.5-flash"
 SESSION_CAP = 15
 DAILY_CAP = 200
@@ -391,6 +392,8 @@ def _api_error(exc: Exception) -> str:
     code = getattr(exc, "code", None)
     if code == 429:
         return "Gemini quota reached for now. Try again in a few minutes."
+    if code == 404:
+        return "Gemini does not know the configured model. Fix or remove the GEMINI_MODEL setting."
     if code in (401, 403):
         return f"Gemini refused the request (HTTP {code}). Check the API key and its access."
     return f"Gemini request failed ({code if code else type(exc).__name__})."

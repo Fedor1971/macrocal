@@ -452,3 +452,10 @@ def test_cap_messages_do_not_tell_people_how_to_bypass_them():
     session = {}
     limiter.try_consume(session)
     assert "reload" not in limiter.try_consume(session).lower()
+
+
+def test_an_unknown_model_name_gets_a_message_that_points_at_the_setting():
+    a, _ = analyst([FakeApiError(404, "models/3 is not found")])
+    error = a.ask("hello", [], {}).error
+    assert "GEMINI_MODEL" in error
+    assert "3" not in error.replace("GEMINI_MODEL", "")  # the model name itself is not echoed back

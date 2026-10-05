@@ -14,8 +14,11 @@ def clear_streamlit_cache():
 
 
 @pytest.fixture(autouse=True)
-def isolate_secrets(monkeypatch):
-    # A developer's real keys (env or .streamlit/secrets.toml) must never change test outcomes.
+def isolate_secrets(monkeypatch, request):
+    # A developer's real keys (env or .streamlit/secrets.toml) must never change offline test
+    # outcomes. Live tests are the exception: their whole point is to use the real keys.
+    if request.node.get_closest_marker("live"):
+        return
     for name in ("FRED_API_KEY", "GEMINI_API_KEY", "GEMINI_MODEL"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(config, "_streamlit_secret", lambda name: None)

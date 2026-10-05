@@ -58,6 +58,8 @@ lines into Streamlit Community Cloud > App settings > Secrets.
 
 Without a key the feature is hidden and says why.
 
+**Never put real keys in `secrets.toml.example`**: it is committed. A test fails if it holds a value.
+
 ## Ask: what to know before enabling it
 
 - The model's only source of numbers is a fixed set of tools over this app's loaders. It is told
@@ -66,8 +68,10 @@ Without a key the feature is hidden and says why.
   app). A question uses one unit however many lookups it needs.
 - **Privacy:** questions are sent to Google's Gemini API. On the free tier Google may use inputs and
   outputs to improve its models, so the tab warns users not to enter sensitive information.
-- The default model name (`gemini-2.5-flash`) was **not verified against the live API** at build
-  time (no key was available). Set `GEMINI_MODEL` if Google has retired it.
+- The default model (`gemini-2.5-flash`) was verified live on 2026-10-05 (the API lists it and it
+  passed the tool-calling and refusal tests; so did `gemini-3.5-flash`, `gemini-3.8-flash` and
+  `gemini-flash-latest`). `GEMINI_MODEL` takes a full model name, not a version number. Leave it
+  unset to use the default; a wrong name shows a message pointing at the setting.
 - Not investment advice.
 
 ## Hosting on Streamlit Community Cloud

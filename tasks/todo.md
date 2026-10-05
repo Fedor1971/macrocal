@@ -17,8 +17,8 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 
 ## Phase 3: AI bot
 - [x] T8 Bot core: tools, validation, caps (no UI) · M
-- [~] T9 Ask tab + Gemini wiring: UI and mocked tests done (214 pass); LIVE Gemini run blocked on GEMINI_API_KEY from Fedor; default model name unverified
-- [~] **Checkpoint 3:** bot logic + UI verified with a fake client (mutation-checked); scripted live Q&A BLOCKED on GEMINI_API_KEY
+- [x] T9 Ask tab + Gemini wiring: verified live 2026-10-05 with Fedor's key (5 scripted questions grounded, off-topic and advice questions declined; default model verified)
+- [x] **Checkpoint 3:** scripted live Q&A passed 2026-10-05 (all figures match their tool output; prediction/advice question declined without tools). FRED also verified live (120 rows).
 
 ## Phase 4: Ship-readiness
 - [x] T10 Degradation states, run.bat, offline release: clean-room offline install verified 2026-10-05 (no-index install, vendored ecocal loads, 157 live events, health ok)
@@ -33,7 +33,7 @@ Plan: `plan.md`. Spec: `../SPEC.md`.
 - [ ] Optional `FRED_API_KEY`
 
 ## Open before ship (as of 2026-10-05, after T11)
-- [ ] Fedor: create `GEMINI_API_KEY` (Google AI Studio) -> run `pytest -m live`, 5 scripted Ask questions, confirm/replace the default model name
+- [x] Gemini key + FRED key added by Fedor to `.streamlit/secrets.toml` (they had first been pasted into the TRACKED secrets.toml.example; caught before any commit, moved, example restored, guard test added)
 - [x] Real `run.bat` run from the offline zip (2026-10-05): created the venv, installed offline, healthy app on 8510. Launch it as `.\run.bat`: this machine sets NoDefaultCurrentDirectoryInExePath=1, so a bare `run.bat` typed in a shell is not found (double-click is fine).
 - [x] US CPI, Unemployment, PPI, retail sales, participation, earnings and payrolls context verified on real data via AppTest (core CPI unmapped as designed); real-browser pass earlier on payrolls and EUR CPI.
 - [x] Test + review phases done 2026-10-05: 237 offline tests, 7 live pass; review found no Critical and 6 Important, all fixed in 4bd71fd. Git history scanned: no real secrets (only a fake test key, since renamed).
